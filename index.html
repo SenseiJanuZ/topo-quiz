@@ -1,0 +1,1135 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Topo Quiz - Provinciehoofdsteden</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        :root {
+            --green: #4CAF50;
+            --red: #e74c3c;
+            --blue: #3498db;
+            --orange: #f39c12;
+            --purple: #9b59b6;
+            --pink: #e91e90;
+            --bg: #f0f4ff;
+        }
+
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background: var(--bg);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            padding: 16px 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+        }
+
+        .header h1 { font-size: 24px; }
+        .header .score-display {
+            display: flex;
+            gap: 16px;
+            align-items: center;
+            font-size: 18px;
+            font-weight: bold;
+        }
+
+        .screen { display: none; padding: 24px; max-width: 700px; margin: 0 auto; }
+        .screen.active { display: block; }
+
+        /* ── Home Screen ── */
+        .home-title {
+            text-align: center;
+            margin: 30px 0 10px;
+            font-size: 36px;
+            color: #333;
+        }
+        .home-subtitle {
+            text-align: center;
+            color: #666;
+            font-size: 18px;
+            margin-bottom: 30px;
+        }
+
+        .level-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+            margin-top: 20px;
+        }
+
+        .level-card {
+            background: white;
+            border-radius: 16px;
+            padding: 24px;
+            text-align: center;
+            cursor: pointer;
+            border: 3px solid #e0e0e0;
+            transition: all 0.2s;
+            position: relative;
+            overflow: hidden;
+        }
+        .level-card:hover:not(.locked) {
+            transform: translateY(-4px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.12);
+        }
+        .level-card.locked {
+            opacity: 0.5;
+            cursor: not-allowed;
+            filter: grayscale(0.5);
+        }
+        .level-card.completed { border-color: var(--green); }
+        .level-card .level-icon { font-size: 48px; margin-bottom: 8px; }
+        .level-card .level-name { font-size: 18px; font-weight: bold; color: #333; }
+        .level-card .level-desc { font-size: 13px; color: #888; margin-top: 4px; }
+        .level-card .level-stars { margin-top: 8px; font-size: 22px; letter-spacing: 2px; }
+        .level-card .lock-icon {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            font-size: 20px;
+        }
+
+        /* ── Quiz Screen ── */
+        .quiz-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+        .quiz-header h2 { font-size: 22px; color: #444; }
+        .btn-back {
+            background: none;
+            border: 2px solid #aaa;
+            border-radius: 10px;
+            padding: 8px 16px;
+            font-size: 14px;
+            cursor: pointer;
+            color: #666;
+        }
+        .btn-back:hover { border-color: #666; color: #333; }
+
+        .progress-bar {
+            width: 100%;
+            height: 14px;
+            background: #e0e0e0;
+            border-radius: 7px;
+            margin-bottom: 24px;
+            overflow: hidden;
+        }
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea, #764ba2);
+            border-radius: 7px;
+            transition: width 0.4s ease;
+        }
+
+        .question-card {
+            background: white;
+            border-radius: 20px;
+            padding: 32px;
+            text-align: center;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+            margin-bottom: 20px;
+        }
+        .question-number {
+            font-size: 14px;
+            color: #aaa;
+            margin-bottom: 8px;
+        }
+        .question-text {
+            font-size: 24px;
+            color: #333;
+            margin-bottom: 8px;
+            line-height: 1.3;
+        }
+        .question-highlight {
+            font-size: 32px;
+            font-weight: bold;
+            color: #764ba2;
+            margin: 12px 0 24px;
+        }
+
+        .answers-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+        .answer-btn {
+            padding: 18px 12px;
+            font-size: 18px;
+            font-weight: 600;
+            border: 3px solid #e0e0e0;
+            border-radius: 14px;
+            background: white;
+            cursor: pointer;
+            transition: all 0.15s;
+            color: #333;
+        }
+        .answer-btn:hover:not(:disabled) {
+            border-color: var(--blue);
+            background: #f0f7ff;
+            transform: scale(1.03);
+        }
+        .answer-btn.correct {
+            border-color: var(--green);
+            background: #e8f5e9;
+            color: var(--green);
+            animation: pulse 0.4s;
+        }
+        .answer-btn.wrong {
+            border-color: var(--red);
+            background: #fde8e8;
+            color: var(--red);
+            animation: shake 0.4s;
+        }
+        .answer-btn:disabled { cursor: default; }
+
+        /* ── Type answer ── */
+        .type-input {
+            width: 100%;
+            padding: 16px;
+            font-size: 22px;
+            border: 3px solid #e0e0e0;
+            border-radius: 14px;
+            text-align: center;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        .type-input:focus { border-color: var(--blue); }
+        .type-input.correct { border-color: var(--green); background: #e8f5e9; }
+        .type-input.wrong { border-color: var(--red); background: #fde8e8; }
+
+        .btn-check {
+            margin-top: 12px;
+            padding: 14px 40px;
+            font-size: 18px;
+            font-weight: bold;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            border-radius: 14px;
+            cursor: pointer;
+            transition: transform 0.15s;
+        }
+        .btn-check:hover { transform: scale(1.05); }
+
+        /* ── Memory Game ── */
+        .memory-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 10px;
+        }
+        .memory-card {
+            aspect-ratio: 1;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 13px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+            border: 3px solid #ddd;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            text-align: center;
+            padding: 6px;
+            line-height: 1.2;
+            user-select: none;
+        }
+        .memory-card.flipped {
+            background: white;
+            color: #333;
+            border-color: var(--blue);
+        }
+        .memory-card.matched {
+            background: #e8f5e9;
+            color: var(--green);
+            border-color: var(--green);
+            cursor: default;
+        }
+        .memory-card.wrong-match {
+            animation: shake 0.4s;
+            border-color: var(--red);
+        }
+
+        /* ── Feedback ── */
+        .feedback {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) scale(0);
+            font-size: 72px;
+            z-index: 100;
+            pointer-events: none;
+            transition: all 0.3s;
+        }
+        .feedback.show {
+            transform: translate(-50%, -50%) scale(1);
+            animation: popIn 0.5s ease;
+        }
+
+        /* ── Results ── */
+        .results-card {
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            text-align: center;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+        }
+        .results-emoji { font-size: 72px; margin-bottom: 16px; }
+        .results-title { font-size: 28px; font-weight: bold; color: #333; }
+        .results-score { font-size: 20px; color: #666; margin: 12px 0; }
+        .results-stars { font-size: 40px; letter-spacing: 4px; margin: 16px 0; }
+        .results-message { font-size: 16px; color: #888; margin-bottom: 24px; }
+        .btn-next, .btn-retry {
+            padding: 14px 32px;
+            font-size: 18px;
+            font-weight: bold;
+            border: none;
+            border-radius: 14px;
+            cursor: pointer;
+            margin: 6px;
+            transition: transform 0.15s;
+        }
+        .btn-next {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+        }
+        .btn-retry {
+            background: white;
+            border: 2px solid #ddd;
+            color: #666;
+        }
+        .btn-next:hover, .btn-retry:hover { transform: scale(1.05); }
+
+        /* ── Confetti ── */
+        .confetti-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 99;
+            overflow: hidden;
+        }
+        .confetti {
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            top: -10px;
+            animation: confettiFall 3s linear forwards;
+        }
+
+        /* ── Streak counter ── */
+        .streak {
+            text-align: center;
+            font-size: 16px;
+            color: var(--orange);
+            font-weight: bold;
+            margin-bottom: 8px;
+            min-height: 24px;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-8px); }
+            75% { transform: translateX(8px); }
+        }
+        @keyframes popIn {
+            0% { transform: translate(-50%, -50%) scale(0) rotate(-20deg); }
+            60% { transform: translate(-50%, -50%) scale(1.3) rotate(5deg); }
+            100% { transform: translate(-50%, -50%) scale(1) rotate(0); }
+        }
+        @keyframes confettiFall {
+            0% { transform: translateY(0) rotate(0deg); opacity: 1; }
+            100% { transform: translateY(100vh) rotate(720deg); opacity: 0; }
+        }
+
+        /* ── Map Quiz ── */
+        .map-container {
+            position: relative;
+            max-width: 400px;
+            margin: 0 auto;
+        }
+        .map-container svg {
+            width: 100%;
+            height: auto;
+            display: block;
+        }
+        .map-container svg path,
+        .map-container svg g {
+            cursor: pointer;
+            transition: fill 0.15s, filter 0.15s;
+        }
+        .map-container svg path:hover,
+        .map-container svg g:hover > path {
+            filter: brightness(0.88);
+        }
+        .map-province-correct path,
+        .map-province-correct {
+            fill: #4CAF50 !important;
+            filter: brightness(1) !important;
+        }
+        .map-province-wrong path,
+        .map-province-wrong {
+            fill: #e74c3c !important;
+            animation: shake 0.4s;
+        }
+        .map-province-highlight path,
+        .map-province-highlight {
+            fill: #667eea !important;
+            filter: brightness(1) !important;
+        }
+        .map-tooltip {
+            position: absolute;
+            background: rgba(0,0,0,0.8);
+            color: white;
+            padding: 6px 12px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: bold;
+            pointer-events: none;
+            transform: translate(-50%, -100%);
+            white-space: nowrap;
+            z-index: 10;
+            opacity: 0;
+            transition: opacity 0.15s;
+        }
+        .map-tooltip.visible { opacity: 1; }
+
+        @media (max-width: 500px) {
+            .level-grid { grid-template-columns: 1fr; }
+            .answers-grid { grid-template-columns: 1fr; }
+            .memory-grid { grid-template-columns: repeat(3, 1fr); }
+            .question-text { font-size: 20px; }
+            .question-highlight { font-size: 26px; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <h1>Topo Quiz</h1>
+    <div class="score-display">
+        <span id="total-stars-display">0</span>
+    </div>
+</div>
+
+<div class="feedback" id="feedback"></div>
+<div class="confetti-container" id="confetti"></div>
+
+<!-- ══ HOME ══ -->
+<div class="screen active" id="screen-home">
+    <div class="home-title">Provinciehoofdsteden</div>
+    <div class="home-subtitle">Leer alle hoofdsteden van Nederland!</div>
+    <div class="level-grid" id="level-grid"></div>
+</div>
+
+<!-- ══ QUIZ ══ -->
+<div class="screen" id="screen-quiz">
+    <div class="quiz-header">
+        <h2 id="quiz-title"></h2>
+        <button class="btn-back" onclick="goHome()">Terug</button>
+    </div>
+    <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
+    <div class="streak" id="streak"></div>
+    <div id="quiz-content"></div>
+</div>
+
+<!-- ══ RESULTS ══ -->
+<div class="screen" id="screen-results">
+    <div class="results-card">
+        <div class="results-emoji" id="results-emoji"></div>
+        <div class="results-title" id="results-title"></div>
+        <div class="results-score" id="results-score"></div>
+        <div class="results-stars" id="results-stars"></div>
+        <div class="results-message" id="results-message"></div>
+        <div>
+            <button class="btn-retry" onclick="retryLevel()">Opnieuw</button>
+            <button class="btn-next" id="btn-next" onclick="goHome()">Verder</button>
+        </div>
+    </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════
+//  DATA
+// ═══════════════════════════════════════
+
+const PROVINCES = [
+    { province: 'Groningen', capital: 'Groningen', color: '#e8a44a' },
+    { province: 'Friesland', capital: 'Leeuwarden', color: '#6b8e5e' },
+    { province: 'Drenthe', capital: 'Assen', color: '#c9a0d0' },
+    { province: 'Overijssel', capital: 'Zwolle', color: '#e8a44a' },
+    { province: 'Flevoland', capital: 'Lelystad', color: '#f0e050' },
+    { province: 'Gelderland', capital: 'Arnhem', color: '#e8a44a' },
+    { province: 'Utrecht', capital: 'Utrecht', color: '#f0e050' },
+    { province: 'Noord-Holland', capital: 'Haarlem', color: '#e8a44a' },
+    { province: 'Zuid-Holland', capital: 'Den Haag', color: '#e8a44a' },
+    { province: 'Zeeland', capital: 'Middelburg', color: '#6b8e5e' },
+    { province: 'Noord-Brabant', capital: "'s-Hertogenbosch", color: '#6b8e5e' },
+    { province: 'Limburg', capital: 'Maastricht', color: '#f0e050' },
+];
+
+const EXTRA_CITIES = [
+    { city: 'Amsterdam', province: 'Noord-Holland', type: 'stad' },
+    { city: 'Rotterdam', province: 'Zuid-Holland', type: 'stad' },
+    { city: 'Eindhoven', province: 'Noord-Brabant', type: 'stad' },
+];
+
+const AREAS = [
+    { name: 'Schiphol', province: 'Noord-Holland', type: 'gebied' },
+    { name: 'Rotterdamse haven', province: 'Zuid-Holland', type: 'gebied' },
+];
+
+const LEVELS = [
+    {
+        id: 1,
+        name: 'Kennismaken',
+        desc: 'Kies de juiste hoofdstad',
+        icon: '🌟',
+        type: 'mc-capital',
+        unlocked: true
+    },
+    {
+        id: 2,
+        name: 'Andersom',
+        desc: 'Welke provincie hoort erbij?',
+        icon: '🔄',
+        type: 'mc-province',
+        unlocked: false
+    },
+    {
+        id: 3,
+        name: 'Grote Steden',
+        desc: 'Amsterdam, Rotterdam & meer',
+        icon: '🏙️',
+        type: 'mc-cities',
+        unlocked: false
+    },
+    {
+        id: 4,
+        name: 'Memory',
+        desc: 'Zoek de juiste paren',
+        icon: '🃏',
+        type: 'memory',
+        unlocked: false
+    },
+    {
+        id: 5,
+        name: 'Typen',
+        desc: 'Typ de hoofdstad zelf',
+        icon: '⌨️',
+        type: 'type',
+        unlocked: false
+    },
+    {
+        id: 6,
+        name: 'Kaart',
+        desc: 'Klik de juiste provincie',
+        icon: '🗺️',
+        type: 'map',
+        unlocked: false
+    },
+    {
+        id: 7,
+        name: 'Eindbaas!',
+        desc: 'Alles door elkaar',
+        icon: '👑',
+        type: 'boss',
+        unlocked: false
+    },
+];
+
+// ═══════════════════════════════════════
+//  STATE
+// ═══════════════════════════════════════
+
+let state = {
+    currentLevel: null,
+    questionIndex: 0,
+    questions: [],
+    score: 0,
+    streak: 0,
+    totalStars: 0,
+    levelStars: {},
+    levelUnlocked: { 1: true },
+    answered: false
+};
+
+function loadState() {
+    const saved = localStorage.getItem('topo-quiz-state');
+    if (saved) {
+        const s = JSON.parse(saved);
+        state.totalStars = s.totalStars || 0;
+        state.levelStars = s.levelStars || {};
+        state.levelUnlocked = s.levelUnlocked || { 1: true };
+    }
+}
+
+function saveState() {
+    localStorage.setItem('topo-quiz-state', JSON.stringify({
+        totalStars: state.totalStars,
+        levelStars: state.levelStars,
+        levelUnlocked: state.levelUnlocked
+    }));
+}
+
+// ═══════════════════════════════════════
+//  SCREENS
+// ═══════════════════════════════════════
+
+function showScreen(id) {
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    document.getElementById('screen-' + id).classList.add('active');
+}
+
+function goHome() {
+    showScreen('home');
+    renderLevelGrid();
+}
+
+function updateStarsDisplay() {
+    document.getElementById('total-stars-display').textContent = state.totalStars + ' ⭐';
+}
+
+// ═══════════════════════════════════════
+//  LEVEL GRID
+// ═══════════════════════════════════════
+
+function renderLevelGrid() {
+    updateStarsDisplay();
+    const grid = document.getElementById('level-grid');
+    grid.innerHTML = '';
+
+    for (const level of LEVELS) {
+        const unlocked = state.levelUnlocked[level.id];
+        const stars = state.levelStars[level.id] || 0;
+        const completed = stars > 0;
+
+        const card = document.createElement('div');
+        card.className = 'level-card' + (unlocked ? '' : ' locked') + (completed ? ' completed' : '');
+        card.innerHTML = `
+            <div class="level-icon">${level.icon}</div>
+            <div class="level-name">Level ${level.id}: ${level.name}</div>
+            <div class="level-desc">${level.desc}</div>
+            <div class="level-stars">${'⭐'.repeat(stars)}${'☆'.repeat(3 - stars)}</div>
+            ${!unlocked ? '<div class="lock-icon">🔒</div>' : ''}
+        `;
+
+        if (unlocked) {
+            card.addEventListener('click', () => startLevel(level));
+        }
+
+        grid.appendChild(card);
+    }
+}
+
+// ═══════════════════════════════════════
+//  QUESTION GENERATORS
+// ═══════════════════════════════════════
+
+function shuffle(arr) {
+    const a = [...arr];
+    for (let i = a.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+}
+
+function pickRandom(arr, n, exclude) {
+    const filtered = arr.filter(x => x !== exclude);
+    return shuffle(filtered).slice(0, n);
+}
+
+function generateMCCapitalQuestions() {
+    return shuffle(PROVINCES).map(p => {
+        const wrongAnswers = pickRandom(PROVINCES.map(x => x.capital), 3, p.capital);
+        const answers = shuffle([p.capital, ...wrongAnswers]);
+        return {
+            type: 'mc',
+            question: 'Wat is de hoofdstad van',
+            highlight: p.province + '?',
+            answers,
+            correct: p.capital
+        };
+    });
+}
+
+function generateMCProvinceQuestions() {
+    return shuffle(PROVINCES).map(p => {
+        const wrongAnswers = pickRandom(PROVINCES.map(x => x.province), 3, p.province);
+        const answers = shuffle([p.province, ...wrongAnswers]);
+        return {
+            type: 'mc',
+            question: 'In welke provincie ligt',
+            highlight: p.capital + '?',
+            answers,
+            correct: p.province
+        };
+    });
+}
+
+function generateCitiesQuestions() {
+    const questions = [];
+
+    for (const c of EXTRA_CITIES) {
+        const wrongAnswers = pickRandom(PROVINCES.map(x => x.province), 3, c.province);
+        questions.push({
+            type: 'mc',
+            question: 'In welke provincie ligt',
+            highlight: c.city + '?',
+            answers: shuffle([c.province, ...wrongAnswers]),
+            correct: c.province
+        });
+    }
+
+    for (const a of AREAS) {
+        const wrongAnswers = pickRandom(PROVINCES.map(x => x.province), 3, a.province);
+        questions.push({
+            type: 'mc',
+            question: 'In welke provincie ligt',
+            highlight: a.name + '?',
+            answers: shuffle([a.province, ...wrongAnswers]),
+            correct: a.province
+        });
+    }
+
+    // Add some capital questions too
+    const extraCapitals = shuffle(PROVINCES).slice(0, 5).map(p => {
+        const wrongAnswers = pickRandom(PROVINCES.map(x => x.capital), 3, p.capital);
+        return {
+            type: 'mc',
+            question: 'Wat is de hoofdstad van',
+            highlight: p.province + '?',
+            answers: shuffle([p.capital, ...wrongAnswers]),
+            correct: p.capital
+        };
+    });
+
+    return shuffle([...questions, ...extraCapitals]);
+}
+
+function generateTypeQuestions() {
+    return shuffle(PROVINCES).map(p => ({
+        type: 'type',
+        question: 'Typ de hoofdstad van',
+        highlight: p.province,
+        correct: p.capital
+    }));
+}
+
+function generateBossQuestions() {
+    const q = [];
+
+    // Mix of everything
+    const caps = shuffle(PROVINCES).slice(0, 4).map(p => {
+        const wrong = pickRandom(PROVINCES.map(x => x.capital), 3, p.capital);
+        return { type: 'mc', question: 'Wat is de hoofdstad van', highlight: p.province + '?', answers: shuffle([p.capital, ...wrong]), correct: p.capital };
+    });
+
+    const provs = shuffle(PROVINCES).slice(0, 4).map(p => {
+        const wrong = pickRandom(PROVINCES.map(x => x.province), 3, p.province);
+        return { type: 'mc', question: 'In welke provincie ligt', highlight: p.capital + '?', answers: shuffle([p.province, ...wrong]), correct: p.province };
+    });
+
+    const types = shuffle(PROVINCES).slice(0, 3).map(p => ({
+        type: 'type', question: 'Typ de hoofdstad van', highlight: p.province, correct: p.capital
+    }));
+
+    const cities = EXTRA_CITIES.map(c => {
+        const wrong = pickRandom(PROVINCES.map(x => x.province), 3, c.province);
+        return { type: 'mc', question: 'In welke provincie ligt', highlight: c.city + '?', answers: shuffle([c.province, ...wrong]), correct: c.province };
+    });
+
+    const areas = AREAS.map(a => {
+        const wrong = pickRandom(PROVINCES.map(x => x.province), 3, a.province);
+        return { type: 'mc', question: 'In welke provincie ligt', highlight: a.name + '?', answers: shuffle([a.province, ...wrong]), correct: a.province };
+    });
+
+    return shuffle([...caps, ...provs, ...types, ...cities, ...areas]);
+}
+
+// ═══════════════════════════════════════
+//  LEVEL START
+// ═══════════════════════════════════════
+
+function startLevel(level) {
+    state.currentLevel = level;
+    state.questionIndex = 0;
+    state.score = 0;
+    state.streak = 0;
+    state.answered = false;
+
+    document.getElementById('quiz-title').textContent = `Level ${level.id}: ${level.name}`;
+
+    if (level.type === 'memory') {
+        startMemoryGame();
+        return;
+    }
+
+    switch (level.type) {
+        case 'mc-capital': state.questions = generateMCCapitalQuestions(); break;
+        case 'mc-province': state.questions = generateMCProvinceQuestions(); break;
+        case 'mc-cities': state.questions = generateCitiesQuestions(); break;
+        case 'type': state.questions = generateTypeQuestions(); break;
+        case 'boss': state.questions = generateBossQuestions(); break;
+    }
+
+    showScreen('quiz');
+    showQuestion();
+}
+
+// ═══════════════════════════════════════
+//  QUESTION DISPLAY
+// ═══════════════════════════════════════
+
+function showQuestion() {
+    const q = state.questions[state.questionIndex];
+    const total = state.questions.length;
+    state.answered = false;
+
+    document.getElementById('progress-fill').style.width = ((state.questionIndex / total) * 100) + '%';
+    updateStreak();
+
+    const content = document.getElementById('quiz-content');
+
+    if (q.type === 'mc') {
+        content.innerHTML = `
+            <div class="question-card">
+                <div class="question-number">Vraag ${state.questionIndex + 1} van ${total}</div>
+                <div class="question-text">${q.question}</div>
+                <div class="question-highlight">${q.highlight}</div>
+                <div class="answers-grid">
+                    ${q.answers.map((a, i) => `<button class="answer-btn" onclick="checkAnswer(this, '${a.replace(/'/g, "\\'")}', '${q.correct.replace(/'/g, "\\'")}')">${a}</button>`).join('')}
+                </div>
+            </div>
+        `;
+    } else if (q.type === 'type') {
+        content.innerHTML = `
+            <div class="question-card">
+                <div class="question-number">Vraag ${state.questionIndex + 1} van ${total}</div>
+                <div class="question-text">${q.question}</div>
+                <div class="question-highlight">${q.highlight}</div>
+                <input type="text" class="type-input" id="type-input" placeholder="Typ hier..." autocomplete="off" autofocus>
+                <br>
+                <button class="btn-check" onclick="checkTypeAnswer()">Controleer</button>
+            </div>
+        `;
+        const input = document.getElementById('type-input');
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') checkTypeAnswer();
+        });
+        setTimeout(() => input.focus(), 100);
+    }
+}
+
+// ═══════════════════════════════════════
+//  ANSWER CHECKING
+// ═══════════════════════════════════════
+
+function normalizeAnswer(str) {
+    return str.toLowerCase().trim()
+        .replace(/[''`]/g, '')
+        .replace(/-/g, ' ')
+        .replace(/s hertogenbosch/g, 'hertogenbosch')
+        .replace(/den bosch/g, 'hertogenbosch');
+}
+
+function checkAnswer(btn, answer, correct) {
+    if (state.answered) return;
+    state.answered = true;
+
+    const isCorrect = answer === correct;
+    const buttons = document.querySelectorAll('.answer-btn');
+
+    buttons.forEach(b => {
+        b.disabled = true;
+        if (b.textContent === correct) b.classList.add('correct');
+    });
+
+    if (isCorrect) {
+        btn.classList.add('correct');
+        state.score++;
+        state.streak++;
+        showFeedback(true);
+    } else {
+        btn.classList.add('wrong');
+        state.streak = 0;
+        showFeedback(false);
+    }
+
+    updateStreak();
+    setTimeout(nextQuestion, 1200);
+}
+
+function checkTypeAnswer() {
+    if (state.answered) return;
+    state.answered = true;
+
+    const input = document.getElementById('type-input');
+    const q = state.questions[state.questionIndex];
+    const userAnswer = normalizeAnswer(input.value);
+    const correctNorm = normalizeAnswer(q.correct);
+
+    const isCorrect = userAnswer === correctNorm ||
+                      (q.correct === "'s-Hertogenbosch" && (userAnswer === 'hertogenbosch' || userAnswer === 'den bosch'));
+
+    if (isCorrect) {
+        input.classList.add('correct');
+        input.value = q.correct;
+        state.score++;
+        state.streak++;
+        showFeedback(true);
+    } else {
+        input.classList.add('wrong');
+        setTimeout(() => {
+            input.value = q.correct;
+            input.classList.remove('wrong');
+            input.classList.add('correct');
+        }, 800);
+        state.streak = 0;
+        showFeedback(false);
+    }
+
+    input.disabled = true;
+    document.querySelector('.btn-check').disabled = true;
+    updateStreak();
+    setTimeout(nextQuestion, 1500);
+}
+
+function nextQuestion() {
+    state.questionIndex++;
+    if (state.questionIndex >= state.questions.length) {
+        finishLevel();
+    } else {
+        showQuestion();
+    }
+}
+
+// ═══════════════════════════════════════
+//  MEMORY GAME
+// ═══════════════════════════════════════
+
+let memoryState = { cards: [], flipped: [], matched: 0, total: 0, moves: 0 };
+
+function startMemoryGame() {
+    const pairs = shuffle(PROVINCES).slice(0, 6);
+    const cards = [];
+
+    pairs.forEach((p, i) => {
+        cards.push({ id: i * 2, pairId: i, text: p.province, type: 'province' });
+        cards.push({ id: i * 2 + 1, pairId: i, text: p.capital, type: 'capital' });
+    });
+
+    memoryState = { cards: shuffle(cards), flipped: [], matched: 0, total: pairs.length, moves: 0 };
+    state.score = 0;
+    state.questions = new Array(pairs.length);
+
+    showScreen('quiz');
+    document.getElementById('progress-fill').style.width = '0%';
+    document.getElementById('streak').textContent = '';
+
+    const content = document.getElementById('quiz-content');
+    content.innerHTML = `
+        <div class="question-card">
+            <div class="question-text">Zoek de juiste paren!</div>
+            <div class="question-number">Provincie + Hoofdstad</div>
+            <div style="margin-top:16px">
+                <div class="memory-grid" id="memory-grid">
+                    ${memoryState.cards.map(c => `
+                        <div class="memory-card" data-id="${c.id}" onclick="flipCard(this, ${c.id})">?</div>
+                    `).join('')}
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+function flipCard(el, id) {
+    const card = memoryState.cards.find(c => c.id === id);
+    if (!card || memoryState.flipped.length >= 2) return;
+    if (el.classList.contains('flipped') || el.classList.contains('matched')) return;
+
+    el.classList.add('flipped');
+    el.textContent = card.text;
+    memoryState.flipped.push({ el, card });
+
+    if (memoryState.flipped.length === 2) {
+        memoryState.moves++;
+        const [a, b] = memoryState.flipped;
+
+        if (a.card.pairId === b.card.pairId && a.card.id !== b.card.id) {
+            setTimeout(() => {
+                a.el.classList.add('matched');
+                b.el.classList.add('matched');
+                memoryState.matched++;
+                state.score++;
+                showFeedback(true);
+
+                document.getElementById('progress-fill').style.width =
+                    ((memoryState.matched / memoryState.total) * 100) + '%';
+
+                if (memoryState.matched === memoryState.total) {
+                    state.questions = new Array(memoryState.total);
+                    setTimeout(finishLevel, 800);
+                }
+
+                memoryState.flipped = [];
+            }, 400);
+        } else {
+            setTimeout(() => {
+                a.el.classList.add('wrong-match');
+                b.el.classList.add('wrong-match');
+            }, 100);
+            setTimeout(() => {
+                a.el.classList.remove('flipped', 'wrong-match');
+                b.el.classList.remove('flipped', 'wrong-match');
+                a.el.textContent = '?';
+                b.el.textContent = '?';
+                memoryState.flipped = [];
+            }, 1000);
+        }
+    }
+}
+
+// ═══════════════════════════════════════
+//  FEEDBACK & EFFECTS
+// ═══════════════════════════════════════
+
+const CORRECT_EMOJIS = ['🎉', '💪', '🌟', '🔥', '👏', '✨', '🏆', '💯'];
+const WRONG_EMOJIS = ['😅', '🤔', '💪', '🙈'];
+const CORRECT_MESSAGES = ['Super!', 'Goed zo!', 'Top!', 'Helemaal goed!', 'Knap!', 'Yes!'];
+const WRONG_MESSAGES = ['Jammer!', 'Bijna!', 'Volgende keer beter!', 'Oeps!'];
+
+function showFeedback(correct) {
+    const el = document.getElementById('feedback');
+    const emojis = correct ? CORRECT_EMOJIS : WRONG_EMOJIS;
+    el.textContent = emojis[Math.floor(Math.random() * emojis.length)];
+    el.classList.add('show');
+    setTimeout(() => el.classList.remove('show'), 600);
+}
+
+function updateStreak() {
+    const el = document.getElementById('streak');
+    if (state.streak >= 3) {
+        el.textContent = '🔥 ' + state.streak + ' op een rij!';
+    } else {
+        el.textContent = '';
+    }
+}
+
+function spawnConfetti() {
+    const container = document.getElementById('confetti');
+    container.innerHTML = '';
+    const colors = ['#667eea', '#764ba2', '#f39c12', '#e74c3c', '#2ecc71', '#3498db', '#e91e90'];
+
+    for (let i = 0; i < 60; i++) {
+        const div = document.createElement('div');
+        div.className = 'confetti';
+        div.style.left = Math.random() * 100 + '%';
+        div.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+        div.style.animationDelay = Math.random() * 1.5 + 's';
+        div.style.animationDuration = (2 + Math.random() * 2) + 's';
+        div.style.borderRadius = Math.random() > 0.5 ? '50%' : '0';
+        div.style.width = (6 + Math.random() * 8) + 'px';
+        div.style.height = (6 + Math.random() * 8) + 'px';
+        container.appendChild(div);
+    }
+
+    setTimeout(() => container.innerHTML = '', 4000);
+}
+
+// ═══════════════════════════════════════
+//  LEVEL FINISH
+// ═══════════════════════════════════════
+
+function finishLevel() {
+    const total = state.questions.length;
+    const pct = state.score / total;
+    let stars = 0;
+    if (pct >= 0.5) stars = 1;
+    if (pct >= 0.8) stars = 2;
+    if (pct >= 1.0) stars = 3;
+
+    const levelId = state.currentLevel.id;
+    const prevStars = state.levelStars[levelId] || 0;
+
+    if (stars > prevStars) {
+        const diff = stars - prevStars;
+        state.totalStars += diff;
+        state.levelStars[levelId] = stars;
+    }
+
+    // Unlock next level if at least 1 star
+    if (stars >= 1) {
+        const nextId = levelId + 1;
+        if (nextId <= LEVELS.length) {
+            state.levelUnlocked[nextId] = true;
+        }
+    }
+
+    saveState();
+    updateStarsDisplay();
+
+    // Show results
+    let emoji, title, message;
+    if (stars === 3) {
+        emoji = '🏆';
+        title = 'Perfect!';
+        message = 'Alle antwoorden goed! Je bent een echte topo-kampioen!';
+        spawnConfetti();
+    } else if (stars === 2) {
+        emoji = '🌟';
+        title = 'Heel goed!';
+        message = 'Bijna alles goed! Nog een keer voor 3 sterren?';
+    } else if (stars === 1) {
+        emoji = '👍';
+        title = 'Goed gedaan!';
+        message = 'Meer dan de helft goed! Oefen nog een keer voor meer sterren.';
+    } else {
+        emoji = '💪';
+        title = 'Blijf oefenen!';
+        message = 'Oefening baart kunst! Probeer het nog een keer.';
+    }
+
+    document.getElementById('results-emoji').textContent = emoji;
+    document.getElementById('results-title').textContent = title;
+    document.getElementById('results-score').textContent = `${state.score} van ${total} goed`;
+    document.getElementById('results-stars').textContent = '⭐'.repeat(stars) + '☆'.repeat(3 - stars);
+    document.getElementById('results-message').textContent = message;
+
+    showScreen('results');
+}
+
+function retryLevel() {
+    startLevel(state.currentLevel);
+}
+
+// ═══════════════════════════════════════
+//  INIT
+// ═══════════════════════════════════════
+
+loadState();
+renderLevelGrid();
+</script>
+
+</body>
+</html>
