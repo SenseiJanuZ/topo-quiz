@@ -441,6 +441,13 @@
             transition: transform 0.15s;
         }
         .btn-add-profile:hover { transform: scale(1.05); }
+        .profile-error {
+            color: var(--red);
+            font-size: 14px;
+            font-weight: bold;
+            margin-top: 8px;
+            min-height: 20px;
+        }
         .user-bar {
             display: flex;
             justify-content: space-between;
@@ -550,6 +557,7 @@
         <input type="text" id="new-profile-name" placeholder="Typ je naam..." maxlength="20">
         <button class="btn-add-profile" onclick="addProfile()">+</button>
     </div>
+    <div class="profile-error" id="profile-error"></div>
 </div>
 
 <!-- ══ HOME ══ -->
@@ -770,8 +778,10 @@ function addProfile() {
 
     const profiles = getProfiles();
     if (profiles.some(p => p.toLowerCase() === name.toLowerCase())) {
+        const err = document.getElementById('profile-error');
+        err.textContent = `"${name}" bestaat al! Klik op het profiel hierboven.`;
+        setTimeout(() => err.textContent = '', 3000);
         input.value = '';
-        selectProfile(profiles.find(p => p.toLowerCase() === name.toLowerCase()));
         return;
     }
 
