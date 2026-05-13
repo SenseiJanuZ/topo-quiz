@@ -785,6 +785,11 @@ function startLevel(level) {
         return;
     }
 
+    if (level.type === 'map') {
+        startMapQuiz();
+        return;
+    }
+
     switch (level.type) {
         case 'mc-capital': state.questions = generateMCCapitalQuestions(); break;
         case 'mc-province': state.questions = generateMCProvinceQuestions(); break;
@@ -1008,6 +1013,154 @@ function flipCard(el, id) {
             }, 1000);
         }
     }
+}
+
+// ═══════════════════════════════════════
+//  MAP QUIZ
+// ═══════════════════════════════════════
+
+let mapSvgCache = null;
+
+async function loadMapSvg() {
+    if (mapSvgCache) return mapSvgCache;
+    const resp = await fetch('netherlands.svg');
+    const text = await resp.text();
+    mapSvgCache = text;
+    return text;
+}
+
+function generateMapQuestions() {
+    const questions = [];
+    const shuffled = shuffle(PROVINCES);
+    for (const p of shuffled) {
+        questions.push({
+            type: 'map',
+            question: 'Klik op de provincie',
+            highlight: p.province,
+            correct: p.province
+        });
+    }
+    return questions;
+}
+
+async function startMapQuiz() {
+    state.questions = generateMapQuestions();
+    state.score = 0;
+    state.questionIndex = 0;
+    state.streak = 0;
+
+    showScreen('quiz');
+    document.getElementById('progress-fill').style.width = '0%';
+    document.getElementById('streak').textContent = '';
+
+    const svgText = await loadMapSvg();
+    showMapQuestion(svgText);
+}
+
+function showMapQuestion(svgText) {
+    const q = state.questions[state.questionIndex];
+    const total = state.questions.length;
+    state.answered = false;
+
+    document.getElementById('progress-fill').style.width = ((state.questionIndex / total) * 100) + '%';
+    updateStreak();
+
+    const content = document.getElementById('quiz-content');
+    content.innerHTML = `
+        <div class="question-card">
+            <div class="question-number">Vraag ${state.questionIndex + 1} van ${total}</div>
+            <div class="question-text">${q.question}</div>
+            <div class="question-highlight">${q.highlight}</div>
+            <div class="map-container" id="map-container">
+                <div class="map-tooltip" id="map-tooltip"></div>
+            </div>
+        </div>
+    `;
+
+    const container = document.getElementById('map-container');
+    const parser = new DOMParser();
+    const svgDoc = parser.parseFromString(svgText, 'image/svg+xml');
+    const svg = svgDoc.documentElement;
+
+    svg.removeAttribute('width');
+    svg.removeAttribute('height');
+    svg.setAttribute('viewBox', '0 0 200 236');
+    svg.style.width = '100%';
+    svg.style.height = 'auto';
+
+    const provinceIds = PROVINCES.map(p => p.province);
+    provinceIds.forEach(id => {
+        const el = svg.getElementById(id);
+        if (!el) return;
+
+        const paths = el.tagName === 'g' ? el.querySelectorAll('path') : [el];
+        paths.forEach(path => {
+            path.style.fill = '#ffd6c0';
+        });
+
+        el.style.cursor = 'pointer';
+        el.addEventListener('click', () => handleMapClick(id, q.correct, svg));
+        el.addEventListener('mouseenter', (e) => showMapTooltip(e, id));
+        el.addEventListener('mousemove', (e) => moveMapTooltip(e));
+        el.addEventListener('mouseleave', hideMapTooltip);
+    });
+
+    container.insertBefore(svg, container.firstChild);
+}
+
+function showMapTooltip(e, name) {
+    const tooltip = document.getElementById('map-tooltip');
+    if (!tooltip) return;
+    tooltip.textContent = name;
+    tooltip.classList.add('visible');
+    moveMapTooltip(e);
+}
+
+function moveMapTooltip(e) {
+    const tooltip = document.getElementById('map-tooltip');
+    if (!tooltip) return;
+    const container = document.getElementById('map-container');
+    const rect = container.getBoundingClientRect();
+    tooltip.style.left = (e.clientX - rect.left) + 'px';
+    tooltip.style.top = (e.clientY - rect.top - 10) + 'px';
+}
+
+function hideMapTooltip() {
+    const tooltip = document.getElementById('map-tooltip');
+    if (tooltip) tooltip.classList.remove('visible');
+}
+
+function handleMapClick(clicked, correct, svg) {
+    if (state.answered) return;
+    state.answered = true;
+
+    const isCorrect = clicked === correct;
+    const clickedEl = svg.getElementById(clicked);
+    const correctEl = svg.getElementById(correct);
+
+    if (isCorrect) {
+        if (clickedEl) clickedEl.classList.add('map-province-correct');
+        state.score++;
+        state.streak++;
+        showFeedback(true);
+    } else {
+        if (clickedEl) clickedEl.classList.add('map-province-wrong');
+        if (correctEl) correctEl.classList.add('map-province-highlight');
+        state.streak = 0;
+        showFeedback(false);
+    }
+
+    updateStreak();
+    hideMapTooltip();
+
+    setTimeout(() => {
+        state.questionIndex++;
+        if (state.questionIndex >= state.questions.length) {
+            finishLevel();
+        } else {
+            showMapQuestion(mapSvgCache);
+        }
+    }, 1200);
 }
 
 // ═══════════════════════════════════════
