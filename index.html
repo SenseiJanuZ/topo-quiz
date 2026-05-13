@@ -460,9 +460,10 @@
             cursor: pointer;
             padding: 6px 12px;
             border-radius: 8px;
-            transition: background 0.15s;
+            border: 1px solid #ddd;
+            transition: all 0.15s;
         }
-        .user-bar-name:hover { background: rgba(0,0,0,0.05); }
+        .user-bar-name:hover { background: rgba(0,0,0,0.05); border-color: #999; }
         .btn-reset {
             font-size: 13px;
             color: #aaa;
@@ -567,7 +568,7 @@
         <button class="btn-reset" onclick="resetProgress()">Reset voortgang</button>
     </div>
     <div class="home-title">Provinciehoofdsteden</div>
-    <div class="home-subtitle">Leer alle hoofdsteden van Nederland!</div>
+    <div class="home-subtitle">Leer de provincies, hoofdsteden en meer!</div>
     <div class="level-grid" id="level-grid"></div>
 </div>
 
@@ -575,7 +576,7 @@
 <div class="screen" id="screen-quiz">
     <div class="quiz-header">
         <h2 id="quiz-title"></h2>
-        <button class="btn-back" onclick="goHome()">Terug</button>
+        <button class="btn-back" onclick="confirmGoHome()">Terug</button>
     </div>
     <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
     <div class="streak" id="streak"></div>
@@ -803,6 +804,7 @@ function deleteProfile(name) {
 function selectProfile(name) {
     currentUser = name;
     loadState();
+    updateStarsDisplay();
     document.getElementById('user-bar-name').textContent = '👤 ' + name;
     goHome();
 }
@@ -836,6 +838,13 @@ function showScreen(id) {
 function goHome() {
     showScreen('home');
     renderLevelGrid();
+}
+
+function confirmGoHome() {
+    if (state.currentLevel && state.questionIndex > 0 && state.questionIndex < state.questions.length) {
+        if (!confirm('Weet je zeker dat je wilt stoppen? Je voortgang gaat verloren.')) return;
+    }
+    goHome();
 }
 
 function updateStarsDisplay() {
@@ -945,19 +954,7 @@ function generateCitiesQuestions() {
         });
     }
 
-    // Add some capital questions too
-    const extraCapitals = shuffle(PROVINCES).slice(0, 5).map(p => {
-        const wrongAnswers = pickRandom(PROVINCES.map(x => x.capital), 3, p.capital);
-        return {
-            type: 'mc',
-            question: 'Wat is de hoofdstad van',
-            highlight: p.province + '?',
-            answers: shuffle([p.capital, ...wrongAnswers]),
-            correct: p.capital
-        };
-    });
-
-    return shuffle([...questions, ...extraCapitals]);
+    return shuffle(questions);
 }
 
 function generateTypeQuestions() {
@@ -997,7 +994,11 @@ function generateBossQuestions() {
         return { type: 'mc', question: 'In welke provincie ligt', highlight: a.name + '?', answers: shuffle([a.province, ...wrong]), correct: a.province };
     });
 
-    return shuffle([...caps, ...provs, ...types, ...cities, ...areas]);
+    const mapQs = shuffle(PROVINCES).slice(0, 3).map(p => ({
+        type: 'map', question: 'Klik op de provincie', highlight: p.province, correct: p.province
+    }));
+
+    return shuffle([...caps, ...provs, ...types, ...cities, ...areas, ...mapQs]);
 }
 
 // ═══════════════════════════════════════
@@ -1048,6 +1049,11 @@ function showQuestion() {
     updateStreak();
 
     const content = document.getElementById('quiz-content');
+
+    if (q.type === 'map') {
+        loadMapSvg().then(svgText => showMapQuestion(svgText));
+        return;
+    }
 
     if (q.type === 'mc') {
         content.innerHTML = `
@@ -1333,7 +1339,7 @@ function showMapQuestion(svgText) {
 
         el.style.cursor = 'pointer';
         el.addEventListener('click', () => handleMapClick(id, q.correct, svg));
-        el.addEventListener('mouseenter', (e) => showMapTooltip(e, id));
+        el.addEventListener('mouseenter', (e) => showMapTooltip(e));
         el.addEventListener('mousemove', (e) => moveMapTooltip(e));
         el.addEventListener('mouseleave', hideMapTooltip);
     });
@@ -1341,10 +1347,10 @@ function showMapQuestion(svgText) {
     container.insertBefore(svg, container.firstChild);
 }
 
-function showMapTooltip(e, name) {
+function showMapTooltip(e) {
     const tooltip = document.getElementById('map-tooltip');
     if (!tooltip) return;
-    tooltip.textContent = name;
+    tooltip.textContent = '?';
     tooltip.classList.add('visible');
     moveMapTooltip(e);
 }
